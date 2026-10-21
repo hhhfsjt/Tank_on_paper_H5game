@@ -1,0 +1,16 @@
+{
+  "name": "paper-tanks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "纸上坦克 H5：电脑与手机均可游玩（AI 辅助生成）",
+  "keywords": [
+    "game",
+    "html5",
+    "canvas",
+    "pwa",
+    "ai-generated"
+  ],
+  "scripts": {
+    "start": "node server.js"
+  }
+}

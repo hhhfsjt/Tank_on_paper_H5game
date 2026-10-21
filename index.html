@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<!-- AI 辅助生成项目 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="generator" content="AI-assisted">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a231f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="纸上坦克">
+<title>纸上坦克 · Paper Tanks</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <main id="boardPane">
+    <div class="board-heading">
+      <div class="branding">
+        <h1>纸上坦克</h1>
+        <span>PAPER&nbsp;TANKS</span>
+      </div>
+      <div id="turnBanner" class="turn-banner">
+        <span class="dot"></span>
+        <span id="turnText">等待开局</span>
+      </div>
+    </div>
+    <div id="boardWrap">
+      <canvas id="board"></canvas>
+    </div>
+    <div class="board-foot">点击己方单位或建筑行动 · 蓝格移动 · 红圈攻击 · 橙格防御射程 · Esc 取消 · Enter 结束回合</div>
+  </main>
+
+  <aside id="sidebar">
+    <div class="side-brand">
+      <span class="side-title">指挥所</span>
+      <span id="modeLabel" class="mode-label">未开始</span>
+    </div>
+
+    <div class="points-box">
+      <div class="points-top">
+        <span>剩余建造值</span>
+        <b id="pointsText">—</b>
+      </div>
+      <div id="pointsPips" class="pips" aria-hidden="true"></div>
+    </div>
+
+    <div class="section-label">建造单位 <span class="section-hint">点卡片 → 点基地/哨站旁空格</span></div>
+    <div id="buildGrid" class="build-grid">
+      <div class="build-card" data-type="tank">
+        <button class="build-main" type="button">
+          <span class="glyph glyph-tank">坦</span>
+          <span class="build-meta"><b>坦克</b><small>6 HP · 攻击 2 · 移动+攻击</small></span>
+          <span class="build-cost"><b>3</b></span>
+        </button>
+      </div>
+      <div class="build-card" data-type="artillery">
+        <button class="build-main" type="button">
+          <span class="glyph glyph-artillery">炮</span>
+          <span class="build-meta"><b>火炮</b><small>2 HP · 攻击 2 · 溅射 1</small></span>
+          <span class="build-cost"><b>2</b></span>
+        </button>
+        <label class="moto"><input type="checkbox" data-moto="artillery"> 摩托化 <span>+1</span></label>
+      </div>
+      <div class="build-card" data-type="atgun">
+        <button class="build-main" type="button">
+          <span class="glyph glyph-atgun">反</span>
+          <span class="build-meta"><b>反坦克炮</b><small>2 HP · 对坦克 3 · 对步兵 1</small></span>
+          <span class="build-cost"><b>2</b></span>
+        </button>
+        <label class="moto"><input type="checkbox" data-moto="atgun"> 摩托化 <span>+1</span></label>
+      </div>
+      <div class="build-card" data-type="infantry">
+        <button class="build-main" type="button">
+          <span class="glyph glyph-infantry">步</span>
+          <span class="build-meta"><b>步兵</b><small>2 HP · 攻击 1 · 相邻打完可撤</small></span>
+          <span class="build-cost"><b>1</b></span>
+        </button>
+        <label class="moto"><input type="checkbox" data-moto="infantry"> 摩托化 <span>+1</span></label>
+      </div>
+    </div>
+
+    <div class="side-actions">
+      <button id="endTurnBtn" class="primary-btn" type="button">结束回合 <kbd>Enter</kbd></button>
+      <button id="restartBtn" class="ghost-btn" type="button">重新开局</button>
+    </div>
+
+    <div id="infoPanel" class="info-panel"></div>
+
+    <div class="section-label">战报</div>
+    <div id="logPanel" class="log-panel"></div>
+
+    <div class="bottom-links">
+      <button id="rulesBtn" class="ghost-btn" type="button">规则说明</button>
+      <button id="debugBtn" class="ghost-btn" type="button">AI 调试</button>
+    </div>
+    <div class="ai-mark">AI 辅助生成 · 仅供学习与娱乐</div>
+  </aside>
+</div>
+
+<div id="observerBar" class="observer-bar hidden">
+  <span class="observer-dot"></span>
+  <span id="observerText">AI 观战</span>
+  <span id="observerEconomy" class="observer-economy"></span>
+  <button id="observerStopBtn" type="button">停止观察</button>
+</div>
+
+<div id="mobileBar" class="mobile-bar hidden">
+  <button id="mobileEndTurnBtn" class="primary-btn" type="button">结束回合</button>
+</div>
+
+<div id="startOverlay" class="overlay">
+  <div class="paper-card start-card">
+    <div class="eyebrow">草稿纸上的回合制战争</div>
+    <h1>纸上坦克</h1>
+    <p class="lead">15 × 15 的战场，每回合 6 点建造值。坦克突进、火炮隔山打牛，摧毁敌方基地。</p>
+    <div class="difficulty-box">
+      <span class="difficulty-label">人机难度</span>
+      <label class="difficulty-option"><input type="radio" name="difficulty" value="normal" checked> 普通</label>
+      <label class="difficulty-option"><input type="radio" name="difficulty" value="hard"> 困难</label>
+    </div>
+    <p class="difficulty-note">普通：双方每座哨站周围各 4 名步兵。困难：电脑每座哨站周围 8 名步兵（仅人机对战生效）。</p>
+    <div class="mode-buttons">
+      <button class="mode-btn" data-mode="pvp" type="button">
+        <b>双人同屏</b>
+        <span>两位玩家轮流操作</span>
+      </button>
+      <button class="mode-btn" data-mode="ai" type="button">
+        <b>人机对战</b>
+        <span>你执红方，对抗蓝方电脑</span>
+      </button>
+    </div>
+    <p class="ai-note">本作由 AI 辅助生成 · 仅供学习与娱乐</p>
+    <button id="startRulesBtn" class="link-btn" type="button">先看规则 →</button>
+  </div>
+</div>
+
+<div id="rulesOverlay" class="overlay hidden">
+  <div class="paper-card rules-card">
+    <div class="rules-head">
+      <h2>规则说明</h2>
+      <button id="rulesCloseBtn" class="icon-btn" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="rules-body">
+      <section>
+        <h3>目标与胜负</h3>
+        <p>15 × 15 方格，左下角为 <code>(0, 0)</code>。红方基地在 <code>(1, 1)</code>，蓝方基地在 <code>(13, 13)</code>。先摧毁敌方基地的一方获胜；基地被摧毁后立即结算。</p>
+      </section>
+
+      <section>
+        <h3>开局配置与难度</h3>
+        <ul>
+          <li>开始前可选择<b>普通</b>或<b>困难</b>人机难度；双人同屏固定使用普通配置。</li>
+          <li>每座哨站开局时在上下左右各获得 1 名<b>免费步兵</b>，不消耗建造值，也不占用之后的哨站部署机会。</li>
+          <li><b>困难（仅人机对战）：</b>电脑每座哨站周围 8 格各获得 1 名免费步兵；玩家的哨站仍为上下左右 4 名。</li>
+          <li>双方都没有单位数量上限，只受棋盘空格和建造值限制。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3>回合流程</h3>
+        <ul>
+          <li><b>获得建造值：</b>回合开始时获得 <b>6 点建造值</b>，未用完不保留。</li>
+          <li><b>基地部署：</b>可在己方基地周围 8 个相邻空格部署任意单位；只要还有建造值和空格，部署数量不限。</li>
+          <li><b>哨站部署：</b>每座哨站每回合各有 <b>1 次</b>额外部署机会，可在其周围 8 个相邻空格部署 1 个<b>非摩托化单位</b>。哨站<b>不能部署坦克</b>（只能部署非摩托化火炮、反坦克炮、步兵），费用照常从建造值扣除；可与该哨站的防御攻击在同一回合使用。</li>
+          <li><b>当回合行动：</b>新部署的单位当回合即可行动。每个单位每回合最多移动一次、攻击一次，具体顺序限制见兵种。</li>
+          <li><b>建筑攻击：</b>己方基地和每座哨站每回合各可手动攻击一次，不会自动开火。</li>
+          <li><b>结束：</b>点“结束回合”把行动权交给对方。</li>
+          <li><b>移动：</b>只检查落点是否在范围内且为空，不计算路径；单位不能重叠，也不能站到基地或哨站所在格。没有战争迷雾，攻击不需要视线。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3>基地与哨站</h3>
+        <div class="rules-cols">
+          <div>
+            <p><b>基地</b>：16 HP。每回合可手动秒杀攻击范围内的 1 个敌方单位。可被单位直接攻击。</p>
+            <p><b>哨站</b>：8 HP。每回合可手动对攻击范围内的 1 个敌方单位造成 2 伤害。可被单位直接攻击。</p>
+            <p>基地和哨站都免疫溅射，且只能攻击<b>单位</b>，不能攻击建筑。</p>
+            <p>红方哨站位于 <code>(1,8)</code>、<code>(8,1)</code>、<code>(5,5)</code>；蓝方哨站位于对角线镜像位置 <code>(6,13)</code>、<code>(13,6)</code>、<code>(9,9)</code>。</p>
+            <p class="small">基地部署、哨站部署与初始驻军见“开局配置与难度”和“回合流程”。</p>
+          </div>
+          <div>
+            <div class="pattern-label">基地 / 哨站攻击范围</div>
+<pre class="pattern">01110
+11111
+11111
+11111
+01110</pre>
+            <p class="small">范围以建筑为中心，四角缺失。每回合可选择范围内的 1 个敌方单位攻击。</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3>兵种数据与行动方式</h3>
+        <div class="table-wrap">
+          <table class="rules-table">
+            <thead>
+              <tr><th>单位</th><th>价值</th><th>HP</th><th>伤害</th><th>移动</th><th>攻击</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>坦克</td><td>3</td><td>6</td><td>2</td><td>5×5 去四角</td><td>菱形 2 格</td></tr>
+              <tr><td>火炮</td><td>2<small>（摩托 +1）</small></td><td>2</td><td>2 + 溅射 1</td><td>相邻 1 格</td><td>7×7 圆角范围</td></tr>
+              <tr><td>反坦克炮</td><td>2<small>（摩托 +1）</small></td><td>2</td><td>2<small>（对坦克 3 / 对步兵 1）</small></td><td>相邻 1 格</td><td>7×7 圆角范围</td></tr>
+              <tr><td>步兵</td><td>1<small>（摩托 +1）</small></td><td>2</td><td>1</td><td>菱形 2 格</td><td>菱形 2 格</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="rules-cols">
+          <div>
+            <h4>坦克</h4>
+            <p>可以<b>移动后攻击</b>，也可以<b>攻击后移动</b>；免疫溅射伤害。</p>
+            <div class="pattern-label">移动范围</div>
+<pre class="pattern small-pattern">01110
+11111
+11111
+11111
+01110</pre>
+            <div class="pattern-label">攻击范围</div>
+<pre class="pattern small-pattern">00100
+01110
+11111
+01110
+00100</pre>
+          </div>
+          <div>
+            <h4>火炮 / 反坦克炮</h4>
+            <p>每回合只能在<b>移动或攻击中选一个</b>。具体伤害、反坦克炮克制与火炮溅射见下方“伤害与溅射”。</p>
+            <div class="pattern-label">攻击范围（7×7）</div>
+<pre class="pattern small-pattern">0011100
+0111110
+1111111
+1111111
+1111111
+0111110
+0011100</pre>
+            <div class="pattern-label">火炮溅射（主目标 2，上下左右 1）</div>
+<pre class="pattern small-pattern">010
+121
+010</pre>
+          </div>
+        </div>
+        <h4>摩托化（火炮 / 反坦克炮 / 步兵，额外 +1）</h4>
+        <ul>
+          <li>火炮与反坦克炮：移动范围变为坦克的 5×5 去四角；<b>只有落点与起点八向相邻时</b>才能在移动后攻击。不能攻击后移动。</li>
+          <li>步兵：移动范围变为坦克范围；可以攻击后移动或移动后攻击，<b>不再受相邻限制</b>。</li>
+          <li>哨站部署不能使用摩托化，也不能部署坦克。</li>
+        </ul>
+        <h4>步兵（未摩托化）</h4>
+        <ul>
+          <li>可以移动到相邻格后攻击；也可以攻击后移动到相邻格。</li>
+          <li>如果这次移动跨出了相邻格（走 2 格），本回合就不能攻击。</li>
+          <li>受到反坦克炮的伤害减少 1。</li>
+        </ul>
+        <div class="pattern-label">步兵移动 / 攻击范围（菱形 2 格，同坦克攻击范围）</div>
+<pre class="pattern small-pattern">00100
+01110
+11111
+01110
+00100</pre>
+      </section>
+
+      <section>
+        <h3>伤害与溅射</h3>
+        <ul>
+          <li>火炮命中主目标造成 2 伤害，并对主目标上下左右四格中的敌方单位各造成 1 溅射伤害。</li>
+          <li>溅射只伤害攻击方的敌方单位，不会误伤友军。</li>
+          <li>坦克、基地、哨站<b>免疫溅射</b>；仍会受到直接命中伤害。</li>
+          <li>基地与哨站每次受到单位的直接攻击时，<b>最多只掉 1 HP</b>，与攻击者的伤害数值无关。</li>
+          <li>反坦克炮：对坦克造成 3 伤害，对步兵造成 1 伤害，对其他单位造成 2 伤害。</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="debugOverlay" class="overlay hidden">
+  <div class="paper-card debug-card">
+    <div class="rules-head">
+      <h2>AI 调试</h2>
+      <button id="debugCloseBtn" class="icon-btn" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="debug-body">
+      <section>
+        <h3>调试模式</h3>
+        <label class="debug-check"><input id="debugEnabledToggle" type="checkbox"> 启用调试模式</label>
+        <p class="small">开启后，AI 会在自己的回合计算一级/二级控制区并据此选位。关闭后隐藏控制区并禁用训练，策略数据仍保留。</p>
+      </section>
+
+      <section>
+        <h3>控制区可视化</h3>
+        <label class="debug-check"><input id="debugEnemyControlToggle" type="checkbox"> 对手控制区（红色，数值=预期火力）</label>
+        <label class="debug-check"><input id="debugOwnControlToggle" type="checkbox"> 己方控制区（蓝色，数值=预期火力）</label>
+        <p class="small">数值 = 当前可攻击火力 + 下一回合可打到该格的最大火力（满值，含基地/哨站）。人机模式显示电脑视角；双人/观察模式显示当前行动方视角。关闭弹窗后仍显示在棋盘上。</p>
+      </section>
+
+      <section>
+        <h3>策略训练</h3>
+        <div id="debugStats" class="debug-stats"></div>
+        <div class="debug-actions">
+          <button id="debugTrainBtn" class="primary-btn" type="button">开始训练</button>
+          <button id="debugResetBtn" class="ghost-btn" type="button">恢复默认策略</button>
+          <button id="debugClearBtn" class="ghost-btn" type="button">清空策略</button>
+          <button id="debugExportBtn" class="ghost-btn" type="button">导出 JSON</button>
+          <button id="debugImportBtn" class="ghost-btn" type="button">导入 JSON</button>
+          <input id="debugImportInput" type="file" accept=".json,application/json" class="hidden">
+        </div>
+        <label class="debug-check observer-mode">
+          <input id="debugObserverToggle" type="checkbox"> 观察者模式：播放 AI 对战画面
+        </label>
+        <p class="small">开启后，点击“播放 AI 对战”会播放 1 局双方 AI 对战供观察，不写入训练统计。</p>
+        <div id="debugTrainStatus" class="debug-status"></div>
+      </section>
+
+      <section>
+        <h3>棋力训练</h3>
+        <p class="small">15×15 空白棋盘，主对角线留空；红方在一侧随机布子，蓝方中心对称，双方使用同一策略。分数 = 先手最终战力 / 初始战力。统计按 7 类棋子分表，X 轴为开局时该格下一回合可遭遇的敌方最大火力。</p>
+        <div class="debug-actions">
+          <button id="chessTrainBtn" class="primary-btn" type="button">开始棋力训练</button>
+          <button id="chessClearBtn" class="ghost-btn" type="button">清空棋力统计</button>
+        </div>
+        <div id="chessTrainStatus" class="debug-status"></div>
+        <div id="debugChessStats" class="chess-stats"></div>
+      </section>
+
+      <section>
+        <h3>玩家学习</h3>
+        <label class="debug-check"><input id="debugLearnPlayerToggle" type="checkbox"> 学习玩家的操作（人机对战中）</label>
+        <p class="small">记录玩家的建造、移动、攻击和局部收益，形成单位构成/进攻性/安全走位/攻击目标偏好画像。只有全局表现（胜负、经济、基地血量）和局部表现都达标时，才把小步调整混入 AI 策略。</p>
+        <div class="debug-actions">
+          <button id="playerLearnClearBtn" class="ghost-btn" type="button">清空学习数据</button>
+        </div>
+        <div id="playerLearnStats" class="debug-stats"></div>
+      </section>
+
+      <section>
+        <h3>最近决策</h3>
+        <div id="debugDecision" class="debug-decision">暂无</div>
+      </section>
+
+      <section>
+        <h3>当前策略参数</h3>
+        <pre id="debugStrategyJson" class="debug-json"></pre>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="gameOverOverlay" class="overlay hidden">
+  <div class="paper-card end-card">
+    <div class="eyebrow" id="endEyebrow">战斗结束</div>
+    <h2 id="endTitle" class="end-title">红方胜利</h2>
+    <p id="endText">敌方基地被摧毁。</p>
+    <div class="end-actions">
+      <button id="againBtn" class="primary-btn" type="button">再来一局</button>
+      <button id="changeModeBtn" class="ghost-btn" type="button">更换模式</button>
+      <button id="viewBoardBtn" class="ghost-btn" type="button">查看棋盘</button>
+    </div>
+  </div>
+</div>
+
+<script src="game.js" defer></script>
+</body>
+</html>

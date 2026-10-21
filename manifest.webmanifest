@@ -1,0 +1,27 @@
+{
+  "name": "纸上坦克",
+  "short_name": "纸上坦克",
+  "description": "在草稿纸上进行的回合制坦克战，支持电脑与手机。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1a231f",
+  "theme_color": "#1a231f",
+  "categories": ["games", "strategy"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
